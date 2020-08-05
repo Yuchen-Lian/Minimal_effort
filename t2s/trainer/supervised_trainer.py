@@ -37,7 +37,7 @@ from .early_stopping import EarlyStopping_NoImprovement
 
 
 class SupervisedTrainer(object):
-    def __init__(self, expt_dir='experiment', loss=NLLLoss(), batch_size=64,
+    def __init__(self, expt_dir='experiments', loss=NLLLoss(), batch_size=64,
                  random_seed=None,
                  checkpoint_every=100, patience=5):
         self._trainer = "Simple Trainer"
@@ -71,6 +71,7 @@ class SupervisedTrainer(object):
                        dev_data=None, test_data=None, teacher_forcing_ratio=0):
 
         epoch_loss_total = 0  # Reset every epoch
+        log_messages = []
 
         device = torch.device("cuda") if torch.cuda.is_available() else -1
 
@@ -114,7 +115,7 @@ class SupervisedTrainer(object):
             epoch_loss_avg = epoch_loss_total / \
                 min(steps_per_epoch, step - start_step)
             epoch_loss_total = 0
-            log_msg = "Finished epoch %d: Train %s: %.4f" % (
+            log_msg = "Finished epoch %d:\tTrain %s: %.4f" % (
                 epoch, self.loss.name, epoch_loss_avg)
 
             time_logging = 1
@@ -125,7 +126,7 @@ class SupervisedTrainer(object):
 
                 # if two-hat agent, we have accuracies for the both hats (Student and Teacher)
                 dev_loss, teacher_accuracy, student_accuracy = eval_results
-                log_msg += ", Dev %s: %.4f, Accuracy Teacher: %.4f, Accuracy Student: %.4f" % (
+                log_msg += "\tDev %s: %.4f, Accuracy Teacher: %.4f, Accuracy Student: %.4f" % (
                     self.loss.name, dev_loss, teacher_accuracy, student_accuracy)
 
                 self.early_stopping_student.on_epoch_end(
@@ -142,11 +143,14 @@ class SupervisedTrainer(object):
                 assert len(eval_results) == 3
                 # if two-hat agent, we have accuracies for the both hats (Student and Teacher)
                 test_loss, teacher_accuracy, student_accuracy = eval_results
-                log_msg += ", Test %s: %.4f, Accuracy Teacher: %.4f, Accuracy Student: %.4f" % (
+                log_msg += "\tTest %s: %.4f, Accuracy Teacher: %.4f, Accuracy Student: %.4f" % (
                     self.loss.name, test_loss, teacher_accuracy, student_accuracy)
             epoch += 1
 
             print(log_msg, flush=True)
+            log_messages.append(log_msg+'\n')
+            
+        return log_messages
 
     def train(self, model, data, n_epochs=5,
               resume=False, dev_data=None, test_data=None,
@@ -193,11 +197,11 @@ class SupervisedTrainer(object):
                     model.parameters()), max_grad_norm=5)
             self.optimizer = optimizer
 
-        self._train_epoches(data, model, n_epochs,
+        log_messages = self._train_epoches(data, model, n_epochs,
                             start_epoch, step, dev_data=dev_data, test_data=test_data,
                             teacher_forcing_ratio=teacher_forcing_ratio)
 
         if self.early_stopping_student.stopped_epoch > 0 and self.early_stopping_teacher._stop_training > 0:
             print('\nTerminated Training for Early Stopping at Epoch %04i' %
                   (max(self.early_stopping_student.stopped_epoch, self.early_stopping_teacher.stopped_epoch)), flush=True)
-        return model
+        return model, log_messages

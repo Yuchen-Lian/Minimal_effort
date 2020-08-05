@@ -61,7 +61,7 @@ if __name__ == '__main__':
                         help='how to optimize teacher part')
     parser.add_argument('--generations', default=0, type=int,
                         help='Agent generations in the iterated learning')
-    parser.add_argument('--data_path_prefix', default='./data/Iconic_LessCounting/iconicity_markers',
+    parser.add_argument('--data_path_prefix', default='./data/fixed_order/forward_marker',
                         help='where to find the supervised training set for the student and the teacher')
     parser.add_argument('--pretrain_agent', default=0, type=int,
                         help="Toggle this option to pretrain a model as a S2S model")
@@ -100,34 +100,32 @@ if __name__ == '__main__':
     set_seed(args.random_seed)
 
     language = args.data_path_prefix.split('/')[-1]
-    save_model_path = f'./experiment/models/{args.save_model_path}_attention{args.use_attention}_hidden{args.hidden_size}_batch{args.batch_size}_epoch{args.n_epochs}_tied{args.tied}_seed{args.random_seed}.p'
-    teacher_train_path = f'{args.data_path_prefix}_teacher/train/action_instruction.txt'
-    teacher_dev_path = f'{args.data_path_prefix}_teacher/dev/action_instruction.txt'
-    teacher_test_path = f'{args.data_path_prefix}_teacher/test/action_instruction.txt'
+    save_model_path = f'./experiments/models/{language}_attention{args.use_attention}_hidden{args.hidden_size}_batch{args.batch_size}_epoch{args.n_epochs}_tied{args.tied}_seed{args.random_seed}.p'
+    save_loss_path = f'./experiments/loss/{language}_attention{args.use_attention}_hidden{args.hidden_size}_batch{args.batch_size}_epoch{args.n_epochs}_tied{args.tied}_seed{args.random_seed}.txt'
+    t2u_train_path = f'{args.data_path_prefix}/train/action_instruction.txt'
+    t2u_dev_path = f'{args.data_path_prefix}/dev/action_instruction.txt'
+    t2u_test_path = f'{args.data_path_prefix}/test/action_instruction.txt'
 
-    all_dataset_vocab = './data/Iconic_LessCounting/vocabulary.txt'
+    all_dataset_vocab = './data/fixed_order/vocabulary.txt'
     field = Field(preprocessing=lambda x: [
                   '<sos>'] + x + ['<eos>'], unk_token=None, batch_first=True, include_lengths=True, pad_token='<pad>')
 
     vocab = torchtext.data.TabularDataset(
         path=all_dataset_vocab, format='tsv',
-        fields=[('src', field), ('tgt', field)]
-    )
+        fields=[('src', field), ('tgt', field)])
 
     field.build_vocab(vocab, max_size=50000)
 
-    teacher_train = torchtext.data.TabularDataset(
-        path=teacher_train_path, format='tsv',
-        fields=[('src', field), ('tgt', field)]
-    )
-    teacher_dev = torchtext.data.TabularDataset(
-        path=teacher_dev_path, format='tsv',
-        fields=[('src', field), ('tgt', field)]
-    )
-    teacher_test = torchtext.data.TabularDataset(
-        path=teacher_test_path, format='tsv',
-        fields=[('src', field), ('tgt', field)]
-    )
+    t2u_train = torchtext.data.TabularDataset(
+        path=t2u_train_path, format='tsv',
+        fields=[('src', field), ('tgt', field)])
+    t2u_dev = torchtext.data.TabularDataset(
+        path=t2u_dev_path, format='tsv',
+        fields=[('src', field), ('tgt', field)])
+    t2u_test = torchtext.data.TabularDataset(
+        path=t2u_test_path, format='tsv', 
+        fields=[('src', field), ('tgt', field)])
+
     print("Vocab: {}".format(field.vocab.stoi), flush=True)
 
     bidirectional = False
@@ -175,9 +173,9 @@ if __name__ == '__main__':
     pad = field.vocab.stoi['<pad>']
     loss = NLLLoss(weight, pad)
 
-    train_dataset = teacher_train
-    dev_dataset = teacher_dev
-    test_dataset = teacher_test
+    train_dataset = t2u_train
+    dev_dataset = t2u_dev
+    test_dataset = t2u_test
 
     if args.eval is not None:
         evaluator = PolyEvaluator(
@@ -200,7 +198,7 @@ if __name__ == '__main__':
                           checkpoint_every=100,
                           expt_dir="./experiments", pretraining=pretraining,
                           polyglot=poly, explosion_train=args.explosion_train, explosion_eval=args.explosion_eval)
-        m = t.train(m, train_dataset,
+        m, log_message = t.train(m, train_dataset,
                     n_epochs=args.n_epochs,
                     dev_data=(None if args.no_dev_eval == 1 else dev_dataset),
                     test_data=(None if args.no_test_eval ==
@@ -208,7 +206,7 @@ if __name__ == '__main__':
                     optimizer=optimizer,
                     teacher_forcing_ratio=args.teacher_forcing_ratio,
                     resume=False)
-        return m
+        return m, log_message
 
 
     def dump(agent, path):
@@ -219,7 +217,7 @@ if __name__ == '__main__':
                  field)
 
     if args.pretrain_agent:
-        A1 = train_model(A1, polyglot, pretraining=True)
+        A1, log_message_pretrain = train_model(A1, polyglot, pretraining=True)
         evaluator = PolyEvaluator(
             loss=loss, explosion_rate=args.explosion_eval, batch_size=2048, polyglot=polyglot)
 
@@ -229,7 +227,12 @@ if __name__ == '__main__':
         dump_path = f"{save_model_path}.dump"
         dump(A1, dump_path)
         print(f"Saved model dump to {dump_path}")
-
+        
+        with open(save_loss_path, 'w') as fw:
+            for s in log_message_pretrain:
+                fw.write(s)
+            fw.write('END PRETRAIN')
+            
     if args.generations > 0:
         for gen in range(1, args.generations + 1):
             set_seed(args.random_seed + gen)
@@ -237,7 +240,7 @@ if __name__ == '__main__':
             A2 = get_seq2seq()
             A2.flatten_parameters()
             t2s = T2S(A1, A2)
-            t2s = train_model(t2s, poly=False, pretraining=False)
+            t2s, log_message_generation = train_model(t2s, poly=False, pretraining=False)
             evaluator = PolyEvaluator(
                 loss=loss, explosion_rate=args.explosion_eval, batch_size=2048, polyglot=False)
             eval_results = evaluator.evaluate(t2s, dev_dataset)
@@ -259,4 +262,9 @@ if __name__ == '__main__':
             dump_path = f"{name}.dump"
             dump(t2s.A2, dump_path)
             print(f"Saved model dump to {dump_path}")
+            name_loss = f"{save_loss_path}.iteration_{gen}"
+            with open(name_loss, 'w') as fw:
+                for s in log_message_generation:
+                    fw.write(s)
+                fw.write('END Generation')            
             A1 = t2s.A2
