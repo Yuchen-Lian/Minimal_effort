@@ -118,7 +118,7 @@ class PolyEvaluator(object):
 
                     A1_target_variable = torch.stack(teacher_other['sequence']).squeeze(2).permute(1, 0)
                     t_out_lengths = model.get_lengths(
-                        A1_target_variable, A1.decoder.eos_id).add_(1.0).clamp_(max=max_len)
+                        A1_target_variable, A1.decoder.eos_id).add_(1).clamp_(max=max_len)
 
                     A1_target_variable = torch.stack(
                         teacher_other['sequence']).squeeze(2).permute(1, 0)
