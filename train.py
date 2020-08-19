@@ -105,8 +105,8 @@ if __name__ == '__main__':
     set_seed(args.random_seed)
 
     language = args.data_path_prefix.split('/')[-1]
-    save_model_path = f'./experiments/models/{language}_attention{args.use_attention}_hidden{args.hidden_size}_batch{args.batch_size}_epoch{args.n_epochs}_tied{args.tied}_seed{args.random_seed}.p'
-    save_loss_path = f'./experiments/loss/{language}_attention{args.use_attention}_hidden{args.hidden_size}_batch{args.batch_size}_epoch{args.n_epochs}_tied{args.tied}_seed{args.random_seed}.txt'
+    save_model_path = f'./experiments/models/{language}_attention{args.use_attention}_hidden{args.hidden_size}_batch{args.batch_size}_epoch{args.n_epochs}_tied{args.tied}_seed{args.random_seed}_shorter{args.minimal_selection}_explosion{args.explosion_2nd}.p'
+    save_loss_path = f'./experiments/loss/{language}_attention{args.use_attention}_hidden{args.hidden_size}_batch{args.batch_size}_epoch{args.n_epochs}_tied{args.tied}_seed{args.random_seed}_shorter{args.minimal_selection}_explosion{args.explosion_2nd}.txt'
     t2u_train_path = f'{args.data_path_prefix}/train/action_instruction.txt'
     t2u_dev_path = f'{args.data_path_prefix}/dev/action_instruction.txt'
     t2u_test_path = f'{args.data_path_prefix}/test/action_instruction.txt'
