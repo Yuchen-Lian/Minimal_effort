@@ -87,12 +87,17 @@ if __name__ == '__main__':
     parser.add_argument('--no_test_eval', default=1, type=int,
                         help="Disable evaluation during training")
 
+    parser.add_argument('--minimal_selection', default=0, type=int,
+                        help="use minimal_selection or not")
+    parser.add_argument('--explosion_2nd', default=1, type=int,
+                        help="minimal_selection expansion")
     args = parser.parse_args()
     print(args, flush=True)
 
     use_attention = args.use_attention == 1
     tied = args.tied == 1
     polyglot = args.polyglot == 1
+    minimal_selection = args.minimal_selection == 1
 
     if polyglot and not args.pretrain_agent:
         assert False, "Shouldn't use polyglot when not pre-training"
@@ -239,7 +244,7 @@ if __name__ == '__main__':
             print("*" * 10, f"Starting generation #{gen}", "*" * 10)
             A2 = get_seq2seq()
             A2.flatten_parameters()
-            t2s = T2S(A1, A2)
+            t2s = T2S(A1, A2, minimal_selection, args.explosion_2nd)
             t2s, log_message_generation = train_model(t2s, poly=False, pretraining=False)
             evaluator = PolyEvaluator(
                 loss=loss, explosion_rate=args.explosion_eval, batch_size=2048, polyglot=False)

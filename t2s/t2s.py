@@ -13,8 +13,10 @@ from .util import repeat_explode
 
 
 class T2S(nn.Module):
-    def __init__(self, A1, A2):
+    def __init__(self, A1, A2, minimal_selection, explosion_2nd):
         super(T2S, self).__init__()
+        self.minimal_selection = minimal_selection
+        self.explosion_2nd = explosion_2nd
         self.A1 = A1
         self.A2 = A2
 
@@ -78,7 +80,7 @@ class T2S(nn.Module):
         return new_de_out, new_de_other
         
 
-    def forward(self, input_variable, input_lengths, target_variable, teacher_forcing_ratio=0.0, presorted=False, minimal_selection=True, explosion_2nd=10):
+    def forward(self, input_variable, input_lengths, target_variable, teacher_forcing_ratio=0.0, presorted=False):
         # turn off sampling in the teacher or in the student
         # when needed.
         A1 = self.A1
@@ -87,16 +89,16 @@ class T2S(nn.Module):
         orig_batch_size = input_variable.size(0)
 
         # two_pass_explode
-        if minimal_selection:
-            input_variable, input_lengths, src_id = self.two_pass_explode(input_variable, input_lengths, explosion_2nd)
+        if self.minimal_selection:
+            input_variable, input_lengths, src_id = self.two_pass_explode(input_variable, input_lengths, self.explosion_2nd)
 
         with torch.no_grad():
             teacher_decoder_outputs, _, teacher_other = A1(
                 input_variable, input_lengths, None, 0.0, presorted=presorted)
 
         # shorter_utterance_selection
-        if minimal_selection:
-            teacher_decoder_outputs, teacher_other = self.shorter_selection(teacher_decoder_outputs, teacher_other, orig_batch_size, explosion_2nd)
+        if self.minimal_selection:
+            teacher_decoder_outputs, teacher_other = self.shorter_selection(teacher_decoder_outputs, teacher_other, orig_batch_size, self.explosion_2nd)
             
         sequence_tensor = torch.stack(teacher_other['sequence']).squeeze(2).permute(1, 0)
 
