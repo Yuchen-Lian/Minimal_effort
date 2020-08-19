@@ -9,6 +9,7 @@ import torch
 import itertools
 import random
 import json
+import pandas as pd
 
 
 def repeat_explode(input, input_length, n_times):
@@ -177,3 +178,50 @@ def dump_agent(A, iterator, output_file, field, instruction_explosion_rate=10):
             print("*"*20, file=log)
         print("-"*20, file=log)
         print(stats.get_json(), file=log)
+
+def dump_agent_csv(A, iterator, output_file, field, instruction_explosion_rate=10):
+    def id_to_text(ids):
+        return [field.vocab.itos[x.item()] for x in ids]
+
+    stats = LangStats()
+    src_, out_, inf_ = [], [], []
+
+    with torch.no_grad():
+        batch_generator = iterator.__iter__()
+        bat = 0
+        for batch in batch_generator:
+            bat = bat + 1
+            tasks = [(batch.src, instruction_explosion_rate, 't2u'),
+                     (batch.tgt, 1, 'u2t')]
+            for ((src, length), explosion_rate, name) in tasks:
+                src, length, src_id = repeat_explode(src, length, explosion_rate)
+                _1, _2, other = A.forward(src, length, None, 0.0)
+                out = torch.stack(other['sequence']).squeeze(2).permute(1, 0)
+                for i in range(src.size(0)):
+                    src_seq = cut_after_eos(id_to_text(src[i, :]))
+                    src_str = ' '.join(src_seq)
+                    out_seq = cut_after_eos(id_to_text(out[i, :]))
+                    out_str = ' '.join(out_seq)
+
+                    inf_series = pd.Series([bat, src_id[i], name], name='n%d' % i,
+                                           index=['batch_id', 'src_id', 'direction'])
+                    src_series = pd.Series(src_str, name='n%d' % i, index=['src'])
+                    out_series = pd.Series(out_str, name='n%d' % i, index=['out'])
+
+                    inf_.append(inf_series)
+                    src_.append(src_series)
+                    out_.append(out_series)
+
+                    if name == "t2u":
+                        stats.push_stat(out_seq)
+
+    df_inf = pd.DataFrame(inf_)
+    df_src = pd.DataFrame(src_)
+    df_out = pd.DataFrame(out_)
+
+    result = pd.concat([df_inf, df_src, df_out], axis=1)
+    result.to_csv(output_file, sep='\t', na_rep='NaN')
+
+    stat_dir = output_file + '.stat'
+    with open(stat_dir, 'w') as f:
+        f.write(stats.get_json())

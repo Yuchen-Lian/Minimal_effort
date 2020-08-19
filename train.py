@@ -26,6 +26,7 @@ import torch
 import torchtext
 from torchtext.data import Field
 
+from t2s.util import dump_agent_csv
 
 
 device = torch.cuda.current_device() if torch.cuda.is_available() else None
@@ -221,6 +222,12 @@ if __name__ == '__main__':
                  path,
                  field)
 
+    def dump_csv(agent, path):
+        iterator = torchtext.data.BucketIterator(dataset=dev_dataset, batch_size=1024, sort=True,
+                                                 sort_within_batch=True, sort_key=lambda x: len(x.src),
+                                                 device=("cuda" if torch.cuda.is_available() else "cpu"), repeat=False)
+        return dump_agent_csv(agent, iterator, path, field)
+
     if args.pretrain_agent:
         A1, log_message_pretrain = train_model(A1, polyglot, pretraining=True)
         evaluator = PolyEvaluator(
@@ -232,6 +239,10 @@ if __name__ == '__main__':
         dump_path = f"{save_model_path}.dump"
         dump(A1, dump_path)
         print(f"Saved model dump to {dump_path}")
+
+        csv_path = f"{save_model_path}.csv"
+        dump_csv(A1, csv_path)
+        print(f"Saved model csv to {csv_path}")
         
         with open(save_loss_path, 'w') as fw:
             for s in log_message_pretrain:
@@ -267,6 +278,11 @@ if __name__ == '__main__':
             dump_path = f"{name}.dump"
             dump(t2s.A2, dump_path)
             print(f"Saved model dump to {dump_path}")
+
+            csv_path = f"{save_model_path}.csv"
+            dump_csv(t2s.A2, csv_path)
+            print(f"Saved model csv to {csv_path}")
+
             name_loss = f"{save_loss_path}.iteration_{gen}"
             with open(name_loss, 'w') as fw:
                 for s in log_message_generation:
