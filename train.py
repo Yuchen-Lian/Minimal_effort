@@ -93,6 +93,12 @@ if __name__ == '__main__':
     parser.add_argument('--explosion_2nd', default=1, type=int,
                         help="minimal_selection expansion")
     args = parser.parse_args()
+    args.generations = 10
+    args.n_epochs = 100
+    args.hidden_size = 20
+    args.batch_size = 16
+    args.pretrain_agent = 1
+    
     print(args, flush=True)
 
     use_attention = args.use_attention == 1
