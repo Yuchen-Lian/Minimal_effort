@@ -246,7 +246,7 @@ if __name__ == '__main__':
         dump(A1, dump_path)
         print(f"Saved model dump to {dump_path}")
 
-        csv_path = f"{save_model_path}.csv"
+        csv_path = f"{name}.csv"
         dump_csv(A1, csv_path)
         print(f"Saved model csv to {csv_path}")
         
@@ -285,7 +285,7 @@ if __name__ == '__main__':
             dump(t2s.A2, dump_path)
             print(f"Saved model dump to {dump_path}")
 
-            csv_path = f"{save_model_path}.csv"
+            csv_path = f"{name}.csv"
             dump_csv(t2s.A2, csv_path)
             print(f"Saved model csv to {csv_path}")
 
